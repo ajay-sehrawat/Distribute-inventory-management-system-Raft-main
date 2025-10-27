@@ -33,7 +33,8 @@ def interactive_client():
             return
         token = login_resp.token
         print(f"Welcome, {username}!\n")
-
+        print("\n=== Current Inventory ===")
+        show_inventory(inv, token)
 
         if "manager" in login_resp.message.lower():
             role = "manager"
