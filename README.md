@@ -1,3 +1,13 @@
+Team Members -
+1. Alankrit Sinha - 2025H1120165P
+2. Ajay Sehrawat  - 2025H1120166P
+3. Diti Nirmal    - 2025H1120149P
+
+College - Bits Pilani, Pilani Campus
+
+Platform: Windows 11
+Tech Stack: Python, gRPC, Raft Algorithm, Distributed Systems
+
 Distributed Inventory Management System (using Raft and gRPC)
 -------------------------------------------------------------
 
@@ -20,8 +30,6 @@ STEP 1: SETUP THE ENVIRONMENT
 3. Activate the virtual environment:
       On Windows:
          venv\Scripts\activate
-      On macOS/Linux:
-         source venv/bin/activate
 
 4. Install required dependencies:
       pip install -r requirements.txt
@@ -86,56 +94,12 @@ Make sure your virtual environment is active before running.
 
 
 -------------------------------------------------------------
-STEP 5: VERIFY PROJECT STRUCTURE
--------------------------------------------------------------
-
-Your folder layout should look like this:
-
-Distribute-inventory-management-system-Raft-main
-│
-├── llm_server
-│   ├── llm.proto
-│   ├── llm_pb2.py
-│   ├── llm_pb2_grpc.py
-│   ├── main_llm_server.py
-│   └── __init__.py
-│
-├── server
-│   ├── app_server.py
-│   ├── auth.proto
-│   ├── inventory.proto
-│   ├── auth_pb2.py
-│   ├── auth_pb2_grpc.py
-│   ├── inventory_pb2.py
-│   ├── inventory_pb2_grpc.py
-│   └── __init__.py
-│
-├── client
-│   ├── client.py
-│   └── __init__.py
-│
-└── requirements.txt
-
-
--------------------------------------------------------------
 STEP 6: PROJECT DEMO VIDEO
 -------------------------------------------------------------
 
-After everything works, upload the working demo video and add the Google Drive link below.
+You can watch the full working demo of this project here:
 
-Project Demo Video Link:
-[PASTE YOUR GOOGLE DRIVE LINK HERE]
+   >>> Project Demo Video Link:
+   https://drive.google.com/file/d/1WeDHV8RpUv0N-Ieixq8kvaRjTjRArNRN/view?usp=sharing <<<
 
-
--------------------------------------------------------------
-NOTES
--------------------------------------------------------------
-
-- Always run commands from the project root folder.
-- Make sure both servers are running before starting the client.
-- If you modify any .proto file, regenerate the gRPC files again using the commands above.
-
-
-Author: Ajay
-Platform: Windows 11
-Tech Stack: Python, gRPC, Raft Algorithm, Distributed Systems
+   (Open the above link in your browser to view the complete demo video.)
