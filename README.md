@@ -258,6 +258,6 @@ Client interface for customers and managers
 
 STEP 6: PROJECT DEMO VIDEO
 
-Paste your Milestone 2 Google Drive link below:
+Milestone 2 Google Drive link below:
 
 Project Demo Video Link: https://drive.google.com/file/d/16loXREwXEuz5sXUETxJOkOztjH_OQ3zH/view?usp=sharing
