@@ -30,5 +30,33 @@ message GetResponse {
   repeated Item items = 2;
   string message = 3;
 }
+message VoteRequest {
+  int32 term = 1;
+  int32 candidateId = 2;
+  int32 lastLogIndex = 3;
+  int32 lastLogTerm = 4;
+}
 
+message VoteReply {
+  int32 term = 1;
+  bool voteGranted = 2;
+}
 
+message AppendRequest {
+  int32 term = 1;
+  int32 leaderId = 2;
+  int32 prevLogIndex = 3;
+  int32 prevLogTerm = 4;
+  int32 commitIndex = 5;
+  repeated string entries = 6;
+}
+
+message AppendReply {
+  int32 term = 1;
+  bool success = 2;
+}
+
+service RaftService {
+  rpc RequestVote(VoteRequest) returns (VoteReply);
+  rpc AppendEntries(AppendRequest) returns (AppendReply);
+}

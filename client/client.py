@@ -16,12 +16,13 @@ def show_inventory(inv_stub, token):
 
 
 session_actions = []
+
 def interactive_client():
-    
-    with grpc.insecure_channel("localhost:50051") as channel:
+
+    # ⭐⭐⭐ THE FIX: FORCE IPV4 ⭐⭐⭐
+    with grpc.insecure_channel("ipv4:127.0.0.1:51001") as channel:
         auth = auth_pb2_grpc.AuthServiceStub(channel)
         inv = inventory_pb2_grpc.InventoryServiceStub(channel)
-
 
         print("=== Login ===")
         username = input("Enter username (e.g., Ajay/manager1): ").strip()
@@ -41,9 +42,7 @@ def interactive_client():
         else:
             role = "customer"
 
-
         purchase_summary = {}
-
 
         while True:
             print("\nOptions:")
@@ -62,7 +61,6 @@ def interactive_client():
                         continue
                     qty = int(qty_str)
 
-                    # Add stock
                     post_resp = inv.Post(
                         inventory_pb2.PostRequest(
                             token=token,
@@ -72,45 +70,30 @@ def interactive_client():
                         )
                     )
                     print(f"{post_resp.status}: {post_resp.message}")
-
-
                     show_inventory(inv, token)
+
                     if post_resp.status == "OK":
                         session_actions.append(f"Added {qty} units to {sku_choice}")
 
-
-
                 elif choice == "2":
-
                     show_inventory(inv, token)
 
-
                 elif choice == "3":
-
                     logout_resp = auth.Logout(auth_pb2.LogoutRequest(token=token))
-
                     print(f"{logout_resp.status}: {logout_resp.message}")
 
-
-
                     if session_actions:
-
                         print("\n=== Session Summary ===")
-
                         for i, act in enumerate(session_actions, start=1):
                             print(f"{i}. {act}")
-
                     else:
-
                         print("\nNo actions performed this session.")
-
                     break
-
 
                 else:
                     print("Invalid option, try again.")
 
-            else:  # Customer menu
+            else:
                 print("1. Buy an item")
                 print("2. Ask LLM about item availability")
                 print("3. Logout")
@@ -124,7 +107,6 @@ def interactive_client():
                         continue
                     qty = int(qty_str)
 
-                    # Place order
                     post_resp = inv.Post(
                         inventory_pb2.PostRequest(
                             token=token,
@@ -134,12 +116,10 @@ def interactive_client():
                         )
                     )
                     print(f"{post_resp.status}: {post_resp.message}")
-
-                    # :todo
                     show_inventory(inv, token)
+
                     if post_resp.status == "OK":
                         session_actions.append(f"Bought {qty} of {sku_choice}")
-
 
                 elif choice == "2":
                     sku_choice = input("Enter SKU to check availability: ").strip().upper()
@@ -153,28 +133,17 @@ def interactive_client():
                     )
                     print(f"LLM says: {llm_resp.message}")
 
-
                 elif choice == "3":
-
                     logout_resp = auth.Logout(auth_pb2.LogoutRequest(token=token))
-
                     print(f"{logout_resp.status}: {logout_resp.message}")
 
-
-
                     if session_actions:
-
                         print("\n=== Session Summary ===")
-
                         for i, act in enumerate(session_actions, start=1):
                             print(f"{i}. {act}")
-
                     else:
-
                         print("\nNo actions performed this session.")
-
                     break
-
 
                 else:
                     print("Invalid option, try again.")
