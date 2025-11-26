@@ -1,3 +1,4 @@
+# raft/run_node.py
 import argparse
 import grpc
 import threading
@@ -5,8 +6,8 @@ import time
 import random
 import sys
 import os
+import signal
 
-# Ensure root project directory is importable
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from concurrent import futures
@@ -23,52 +24,39 @@ from raft.raft_node import (
 )
 
 
-# ================================================================
-# Start GRPC server (RaftService + AppServerWithRaft)
-# ================================================================
-def start_grpc_server(state, app_servicer, raft_servicer, port):
+def start_grpc_server(state, app_servicer, raft_servicer, port, bind_address="127.0.0.1"):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=30))
-
-    # Add RAFT RPC SERVICES
     inventory_pb2_grpc.add_RaftServiceServicer_to_server(raft_servicer, server)
-
-    # Add APP SERVER (AUTH + INVENTORY)
     app_server.register_services(server, app_servicer)
-
-    # Bind IPv4 explicitly (avoids IPv6/IPv4 mismatch on Windows)
-    server.add_insecure_port(f"0.0.0.0:{port}")
+    address = f"{bind_address}:{port}"
+    bound_port = server.add_insecure_port(address)
+    if bound_port == 0:
+        print(f"[Node {state.node_id}] ERROR: Failed to bind to address {address}.")
+        raise RuntimeError(f"Failed to bind to address {address}")
     server.start()
-
-    print(f"[Node {state.node_id}] Running on port {port} - Role: {state.state}")
+    print(f"[Node {state.node_id}] Running on {address} - Role: {state.state}")
     return server
 
 
-# ================================================================
-# Election Thread (uses last_heartbeat to avoid premature elections)
-# ================================================================
 def election_loop(state: RaftState):
-    # initial random deadline based on last_heartbeat
     timeout = random.uniform(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX)
     deadline = state.last_heartbeat + timeout
-
+    print(f"[Node {state.node_id}] Election loop started (timeouts {ELECTION_TIMEOUT_MIN}-{ELECTION_TIMEOUT_MAX}s)")
     while True:
         time.sleep(0.05)
-
         with state.lock:
-            # leader has no election duties
             if state.state == "leader":
-                # refresh stubs so leader can contact followers
-                state.refresh_stubs()
-                # push deadline forward to avoid participating in election loop
+                try:
+                    state.refresh_stubs()
+                except Exception:
+                    pass
                 deadline = state.last_heartbeat + random.uniform(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX)
                 continue
 
-            # If a recent heartbeat was seen, postpone election
             now = time.time()
             if now < deadline:
                 continue
 
-            # Timeout passed -> start election
             state.state = "candidate"
             state.current_term += 1
             state.voted_for = state.node_id
@@ -77,10 +65,14 @@ def election_loop(state: RaftState):
             last_index = len(state.log) - 1
             last_term = state.log[last_index][0] if last_index >= 0 else 0
 
-            # Ensure stubs exist before sending RPCs
-            state.refresh_stubs()
+            try:
+                state.refresh_stubs()
+            except Exception:
+                pass
 
             for pid, stub in state.stubs.items():
+                if pid == state.node_id:
+                    continue
                 if stub is None:
                     continue
                 try:
@@ -91,45 +83,62 @@ def election_loop(state: RaftState):
                         lastLogTerm=last_term,
                     )
                     rep = stub.RequestVote(req, timeout=1)
-                    if rep.voteGranted:
+                    if getattr(rep, "voteGranted", False):
                         votes += 1
                 except Exception:
-                    # treat RPC failures as no vote
                     pass
 
-            # Win Election? (peers now includes self)
-            if votes > (len(state.peers) // 2):
+            majority = (len(state.peers) // 2)
+            if votes > majority:
                 state.state = "leader"
                 state.leader_id = state.node_id
-                # when leader, set last_heartbeat to now so followers don't race
                 state.last_heartbeat = time.time()
                 print(f"\n🔥 Node {state.node_id} became LEADER (Term {state.current_term})\n")
+                # send immediate heartbeat so followers learn quickly
+                try:
+                    state.refresh_stubs()
+                    last_index = len(state.log) - 1
+                    last_term = state.log[last_index][0] if last_index >= 0 else 0
+                    for pid, stub in state.stubs.items():
+                        if pid == state.node_id or stub is None:
+                            continue
+                        areq = inventory_pb2.AppendRequest(
+                            term=state.current_term,
+                            leaderId=state.node_id,
+                            prevLogIndex=last_index,
+                            prevLogTerm=last_term,
+                            commitIndex=state.commit_index,
+                            entries=[],
+                        )
+                        try:
+                            stub.AppendEntries(areq, timeout=2)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             else:
                 state.state = "follower"
 
-            # new deadline computed from last_heartbeat
             timeout = random.uniform(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX)
             deadline = state.last_heartbeat + timeout
 
 
-# ================================================================
-# Heartbeat / Log Replication Thread (leader only)
-# ================================================================
 def heartbeat_loop(state: RaftState):
+    print(f"[Node {state.node_id}] Heartbeat loop started (interval {HEARTBEAT_INTERVAL}s)")
     while True:
         time.sleep(HEARTBEAT_INTERVAL)
-
         with state.lock:
             if state.state != "leader":
                 continue
-
             last_index = len(state.log) - 1
             last_term = state.log[last_index][0] if last_index >= 0 else 0
-
-            # refresh stubs before broadcasting
-            state.refresh_stubs()
-
+            try:
+                state.refresh_stubs()
+            except Exception:
+                pass
             for pid, stub in state.stubs.items():
+                if pid == state.node_id:
+                    continue
                 if stub is None:
                     continue
                 try:
@@ -139,68 +148,82 @@ def heartbeat_loop(state: RaftState):
                         prevLogIndex=last_index,
                         prevLogTerm=last_term,
                         commitIndex=state.commit_index,
-                        entries=[],  # heartbeat
+                        entries=[],
                     )
-                    stub.AppendEntries(req, timeout=5)
+                    stub.AppendEntries(req, timeout=2)
                 except Exception:
-                    # ignore failed heartbeats; followers may be down
                     pass
 
 
-# ================================================================
-# Apply Committed Logs Thread (Followers & Leader)
-# ================================================================
 def apply_loop(state: RaftState, app_servicer):
-    """
-    Continuously apply committed log entries to the state machine.
-    """
+    print(f"[Node {state.node_id}] Apply loop started")
     while True:
         try:
             apply_committed_entries(state, app_servicer.inventory.apply_business_logic)
         except Exception as e:
-            # do not crash the thread on apply errors
             print("[APPLY ERROR]", e)
         time.sleep(0.05)
 
 
-# ================================================================
-# MAIN
-# ================================================================
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--id", type=int, required=True)
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--peers", nargs="*", default=[])
+    parser.add_argument("--bind", type=str, default="127.0.0.1")
     args = parser.parse_args()
 
-    # Build peer dictionary (from --peers argument)
     peers = {}
     for p in args.peers:
-        pid, addr = p.split(":")[0], ":".join(p.split(":")[1:])
-        peers[int(pid)] = addr
+        if ":" not in p:
+            print(f"[WARN] skipping invalid peer entry: {p}")
+            continue
+        pid_str, addr = p.split(":", 1)
+        try:
+            pid = int(pid_str)
+        except ValueError:
+            print(f"[WARN] invalid peer id in entry: {p}")
+            continue
+        peers[pid] = addr
 
-    # IMPORTANT: add this node's own address into peers so forwarding and replication work
-    peers[args.id] = f"127.0.0.1:{args.port}"
+    self_addr = f"{args.bind}:{args.port}"
+    if args.id in peers:
+        print(f"[WARN] peers contained this node id ({args.id}). Overriding address with {self_addr}.")
+    peers[args.id] = self_addr
 
-
-    # Create Raft State (peers now includes self)
     state = RaftState(args.id, peers)
-
-    # App server (wrapped with Raft)
     app_servicer = app_server.AppServerWithRaft(state)
-
-    # Raft RPC handler
     raft_servicer = RaftRPC(state)
 
-    # Start GRPC server
-    grpc_server = start_grpc_server(state, app_servicer, raft_servicer, args.port)
+    try:
+        grpc_server = start_grpc_server(state, app_servicer, raft_servicer, args.port, bind_address=args.bind)
+    except Exception as e:
+        print(f"[Node {args.id}] Failed to start gRPC server: {e}")
+        sys.exit(1)
 
-    # Start background threads
-    threading.Thread(target=election_loop, args=(state,), daemon=True).start()
-    threading.Thread(target=heartbeat_loop, args=(state,), daemon=True).start()
-    threading.Thread(target=apply_loop, args=(state, app_servicer), daemon=True).start()
+    t_election = threading.Thread(target=election_loop, args=(state,), daemon=True)
+    t_heartbeat = threading.Thread(target=heartbeat_loop, args=(state,), daemon=True)
+    t_apply = threading.Thread(target=apply_loop, args=(state, app_servicer), daemon=True)
 
-    grpc_server.wait_for_termination()
+    t_election.start()
+    t_heartbeat.start()
+    t_apply.start()
+
+    def shutdown(signum, frame):
+        print(f"\n[Node {state.node_id}] Shutting down...")
+        try:
+            grpc_server.stop(0)
+        except Exception:
+            pass
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
+
+    try:
+        grpc_server.wait_for_termination()
+    except KeyboardInterrupt:
+        shutdown(None, None)
 
 
 if __name__ == "__main__":

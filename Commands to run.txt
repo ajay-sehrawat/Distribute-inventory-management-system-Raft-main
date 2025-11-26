@@ -1,0 +1,6 @@
+venv\Scripts\activate
+python -m llm_server.main_llm_server
+python -u raft/run_node.py --id 1 --port 51001 --peers 2:127.0.0.1:51002 3:127.0.0.1:51003
+python -u raft/run_node.py --id 2 --port 51002 --peers 1:127.0.0.1:51001 3:127.0.0.1:51003
+python -u raft/run_node.py --id 3 --port 51003 --peers 1:127.0.0.1:51001 2:127.0.0.1:51002
+python -m client.client --demo
