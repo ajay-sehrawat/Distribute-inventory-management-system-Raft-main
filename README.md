@@ -103,3 +103,89 @@ You can watch the full working demo of this project here:
    https://drive.google.com/file/d/1WeDHV8RpUv0N-Ieixq8kvaRjTjRArNRN/view?usp=sharing <<<
 
    (Open the above link in your browser to view the complete demo video.)
+
+
+
+MILESTONE 2:
+DISTRIBUTED INVENTORY MANAGEMENT SYSTEM (MILESTONE 2)
+
+Project Overview
+Milestone 2 extends the earlier single-server system into a fully replicated 3-node Raft cluster with leader election, log replication, and consistent inventory updates across all nodes, LLM server recommendations.
+
+The system contains four main components:
+llm_server – Handles LLM-based recommendations for inventory
+server – Authentication and inventory logic combined with Raft
+raft – Core Raft implementation which consists of leader election, log replication
+client – Command-line client to interact with the distributed service
+
+-------------------------------------------------------------
+STEP 1: Setup all terminals (Milestone 2) 
+-------------------------------------------------------------
+
+A working Milestone 2 setup requires running four components:
+
+LLM Server
+Raft Node 1
+Raft Node 2
+Raft Node 3
+Client
+
+Important: Ensure the virtual environment is activated in every terminal before running any command.
+
+-------------------------------------------------------------
+STEP 2: Run LLM Server
+-------------------------------------------------------------
+
+Command:
+python -m llm_server.main_llm_server
+Wait for the message that the LLM server is running.
+
+-------------------------------------------------------------
+STEP 3: Run 3 RAFT Nodes in 3 Separate Terminals
+-------------------------------------------------------------
+
+Terminal 1->
+python raft/run_node.py --id 1 --port 51001 --peers 2:127.0.0.1:51002 3:127.0.0.1:51003
+
+Terminal 2->
+python raft/run_node.py --id 2 --port 51002 --peers 1:127.0.0.1:51001 3:127.0.0.1:51003
+
+Terminal 3->
+python raft/run_node.py --id 3 --port 51003 --peers 1:127.0.0.1:51001 2:127.0.0.1:51002
+
+The nodes will start leader election. You will see output such as->
+Node 2 became LEADER (Term X).
+This means leader election is working successfully.
+
+-------------------------------------------------------------
+STEP 4: Run the Client
+-------------------------------------------------------------
+
+Open a new terminal and run->
+python -m client.client
+
+Features available through the client->
+
+User login (customer or manager)
+View inventory
+Place orders
+Add stock (manager only)
+Ask the LLM for inventory advice
+Automatic updates reflected across all Raft nodes
+
+FEATURES IMPLEMENTED IN MILESTONE 2 ->
+
+Fully functional Raft cluster (3 nodes)
+Leader election and automatic failover
+Log replication: every write operation is stored and committed consistently
+Followers forward write requests to the leader automatically
+Inventory updates are consistently applied across all nodes
+LLM integration for intelligent stock suggestions
+The Stock gets updated as users purchase
+
+-------------------------------------------------------------
+STEP 5: PROJECT DEMO VIDEO
+-------------------------------------------------------------
+Milestone 2 Google Drive link below:
+
+Project Demo Video Link: https://drive.google.com/file/d/16loXREwXEuz5sXUETxJOkOztjH_OQ3zH/view?usp=sharing
