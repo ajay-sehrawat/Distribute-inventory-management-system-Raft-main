@@ -1,10 +1,3 @@
-Team Members -
-1. Alankrit Sinha - 2025H1120165P
-2. Ajay Sehrawat  - 2025H1120166P
-3. Diti Nirmal    - 2025H1120149P
-
-College - Bits Pilani, Pilani Campus
-
 Platform: Windows 11
 Tech Stack: Python, gRPC, Raft Algorithm, Distributed Systems
 
@@ -181,11 +174,4 @@ Log replication: every write operation is stored and committed consistently
 Followers forward write requests to the leader automatically
 Inventory updates are consistently applied across all nodes
 LLM integration for intelligent stock suggestions
-The Stock gets updated as users purchase
-
--------------------------------------------------------------
-STEP 5: PROJECT DEMO VIDEO
--------------------------------------------------------------
-Milestone 2 Google Drive link below:
-
-Project Demo Video Link: https://drive.google.com/file/d/16loXREwXEuz5sXUETxJOkOztjH_OQ3zH/view?usp=sharing
+The Stock gets updated.
